@@ -93,11 +93,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSecretKeyLogin }) => {
             <p className="text-xs text-gray-500">
               Secure access to professional invoice and quotation system
             </p>
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-xs text-blue-700">
-                <strong>Demo Access:</strong> Use secret key <code className="bg-blue-100 px-1 rounded">9578078500</code>
-              </p>
-            </div>
           </div>
         </div>
       </div>
