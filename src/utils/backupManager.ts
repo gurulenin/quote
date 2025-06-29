@@ -1,4 +1,4 @@
-import { firebaseManager } from './firebaseManager';
+import { indexedDBManager } from './indexedDBManager';
 
 interface AppBackup {
   version: string;
@@ -19,8 +19,8 @@ class BackupManager {
 
   async createFullBackup(): Promise<Blob> {
     try {
-      // Get all documents from Firebase
-      const documents = await firebaseManager.getAllDocuments();
+      // Get all documents from IndexedDB
+      const documents = await indexedDBManager.getAllDocuments();
 
       // Get localStorage data
       const settings = this.getLocalStorageData();
@@ -105,9 +105,9 @@ class BackupManager {
       // Clear existing data
       await this.clearAllData();
 
-      // Restore documents to Firebase
+      // Restore documents to IndexedDB
       if (backupData.documents.length > 0) {
-        await firebaseManager.importDocuments(backupData.documents);
+        await indexedDBManager.importDocuments(backupData.documents);
       }
 
       // Restore localStorage data
@@ -191,11 +191,11 @@ class BackupManager {
   }
 
   private async clearAllData(): Promise<void> {
-    // Clear Firebase documents
-    await firebaseManager.clearAllDocuments();
+    // Clear IndexedDB documents
+    await indexedDBManager.clearAllDocuments();
 
     // Clear relevant localStorage items (but keep auth for current session)
-    const keysToKeep = ['invoice_app_auth', 'firebase_session_token']; // Keep current session
+    const keysToKeep = ['invoice_app_auth']; // Keep current session
     const allKeys = Object.keys(localStorage);
     
     allKeys.forEach(key => {
@@ -209,7 +209,7 @@ class BackupManager {
     if (!settings) return;
 
     Object.entries(settings).forEach(([key, value]) => {
-      if (key !== 'invoice_app_auth' && key !== 'firebase_session_token') { // Don't restore auth to avoid logout
+      if (key !== 'invoice_app_auth') { // Don't restore auth to avoid logout
         try {
           localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
         } catch (error) {
@@ -237,7 +237,7 @@ class BackupManager {
     estimatedSize: string;
   }> {
     try {
-      const documents = await firebaseManager.getAllDocuments();
+      const documents = await indexedDBManager.getAllDocuments();
       
       // Estimate backup size
       const sampleData = {
