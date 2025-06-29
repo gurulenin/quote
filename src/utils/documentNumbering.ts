@@ -1,5 +1,5 @@
 import { DocumentType } from '../types';
-import { firebaseManager } from './firebaseManager';
+import { indexedDBManager } from './indexedDB';
 
 export class DocumentNumberingManager {
   private static instance: DocumentNumberingManager;
@@ -62,7 +62,7 @@ export class DocumentNumberingManager {
 
   async getNextNumber(docType: DocumentType): Promise<string> {
     try {
-      const documents = await firebaseManager.getDocumentsByType(docType);
+      const documents = await indexedDBManager.getDocumentsByType(docType);
       const currentYear = new Date().getFullYear();
       
       if (documents.length === 0) {
@@ -96,7 +96,7 @@ export class DocumentNumberingManager {
 
   async getRecentNumbers(docType: DocumentType, limitCount: number = 10): Promise<string[]> {
     try {
-      const documents = await firebaseManager.getDocumentsByType(docType);
+      const documents = await indexedDBManager.getDocumentsByType(docType);
       
       // Sort by creation date (most recent first) and limit the results
       const recentDocuments = documents
@@ -112,7 +112,7 @@ export class DocumentNumberingManager {
 
   async checkDuplicateNumber(docNumber: string, docType: DocumentType, excludeDocId?: string): Promise<boolean> {
     try {
-      return await firebaseManager.checkDuplicateNumber(docNumber, docType, excludeDocId);
+      return await indexedDBManager.checkDuplicateNumber(docNumber, docType, excludeDocId);
     } catch (error) {
       console.error('Error checking duplicate number:', error);
       return false;
