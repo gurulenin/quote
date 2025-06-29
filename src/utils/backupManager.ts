@@ -1,4 +1,4 @@
-import { indexedDBManager } from './indexedDBManager';
+import { indexedDBManager } from './indexedDB';
 
 interface AppBackup {
   version: string;
