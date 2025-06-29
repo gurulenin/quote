@@ -5,7 +5,7 @@ export interface User {
   loginTime?: string;
   email?: string;
   uid?: string;
-  authMethod?: 'firebase';
+  authMethod?: 'secret_key';
 }
 
 export interface CompanyInfo {

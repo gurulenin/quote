@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Download, Upload, Plus, Search, Edit3, Trash2, Globe, RefreshCw, CheckCircle, AlertCircle, FileSpreadsheet, Cloud, Tag, DollarSign, FolderSync as Sync } from 'lucide-react';
+import { Package, Download, Upload, Plus, Search, Edit3, Trash2, Globe, RefreshCw, CheckCircle, AlertCircle, FileSpreadsheet, HardDrive, Tag, DollarSign, FolderSync as Sync } from 'lucide-react';
 import { useProductData, ProductData } from '../hooks/useProductData';
 
 interface ProductsTabProps {
@@ -29,11 +29,6 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
   const [lastSync, setLastSync] = useState(
     localStorage.getItem('last_product_sync') || null
   );
-  const [cloudInfo, setCloudInfo] = useState<{
-    lastUpdated: string | null;
-    source: string;
-    count: number;
-  }>({ lastUpdated: null, source: 'none', count: 0 });
 
   const [newProduct, setNewProduct] = useState<ProductData>({
     Description: '',
@@ -41,21 +36,6 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
     Price: '',
     Category: ''
   });
-
-  // Load cloud info on component mount
-  React.useEffect(() => {
-    loadCloudInfo();
-  }, []);
-
-  const loadCloudInfo = async () => {
-    try {
-      const { firebaseManager } = await import('../utils/firebaseManager');
-      const info = await firebaseManager.getProductDataInfo();
-      setCloudInfo(info);
-    } catch (error) {
-      console.error('Error loading cloud info:', error);
-    }
-  };
 
   // Filter products based on search term
   const filteredProducts = products.filter(product =>
@@ -200,9 +180,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
         throw new Error('No valid data rows found in the sheet. Please ensure your sheet contains data rows with at least one non-empty cell per row.');
       }
       
-      // Save to Firebase with Google Sheets source
-      const { firebaseManager } = await import('../utils/firebaseManager');
-      await firebaseManager.saveProductData(productData, 'google_sheets', googleSheetUrl);
+      // Save to IndexedDB
+      const success = await productDataHook.saveProductData(productData);
+      if (!success) {
+        throw new Error('Failed to save product data to local storage');
+      }
       
       // Also save to localStorage as backup
       localStorage.setItem('imported_product_data', JSON.stringify(productData));
@@ -213,11 +195,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
       setLastSync(timestamp);
       
       setLoadStatus('success');
-      onMessage(`Successfully loaded ${productData.length} product records from Google Sheets and saved to cloud`);
+      onMessage(`Successfully loaded ${productData.length} product records from Google Sheets and saved locally`);
       
-      // Refresh the data and cloud info
+      // Refresh the data
       await refreshData();
-      await loadCloudInfo();
     } catch (error) {
       console.error('Error loading product data:', error);
       setLoadStatus('error');
@@ -281,8 +262,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
           Category: ''
         });
         setShowAddForm(false);
-        onMessage('New product added successfully and saved to cloud');
-        await loadCloudInfo();
+        onMessage('New product added successfully and saved locally');
       } else {
         onMessage('Failed to add new product');
       }
@@ -313,8 +293,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
       const success = await updateProduct(productIndex, editingProduct);
       if (success) {
         setEditingProduct(null);
-        onMessage('Product updated successfully and saved to cloud');
-        await loadCloudInfo();
+        onMessage('Product updated successfully and saved locally');
       } else {
         onMessage('Failed to update product');
       }
@@ -332,8 +311,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
     try {
       const success = await deleteProduct(productToDelete);
       if (success) {
-        onMessage('Product deleted successfully and updated in cloud');
-        await loadCloudInfo();
+        onMessage('Product deleted successfully and updated locally');
       } else {
         onMessage('Failed to delete product');
       }
@@ -343,19 +321,18 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
     }
   };
 
-  const handleSyncWithCloud = async () => {
+  const handleSyncWithLocal = async () => {
     try {
       setIsLoading(true);
       const success = await syncWithCloud();
       if (success) {
-        onMessage('Product data synced successfully with cloud');
-        await loadCloudInfo();
+        onMessage('Product data refreshed successfully');
       } else {
-        onMessage('Failed to sync product data');
+        onMessage('Failed to refresh product data');
       }
     } catch (error) {
-      console.error('Error syncing product data:', error);
-      onMessage('Failed to sync product data');
+      console.error('Error refreshing product data:', error);
+      onMessage('Failed to refresh product data');
     } finally {
       setIsLoading(false);
     }
@@ -373,7 +350,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
       case 'error':
         return <AlertCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <Cloud className="w-4 h-4 text-gray-400" />;
+        return <HardDrive className="w-4 h-4 text-gray-400" />;
     }
   };
 
@@ -384,7 +361,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
           <Package className="w-8 h-8 text-purple-600 mr-3" />
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Product Management</h1>
-            <p className="text-gray-600">Manage your product catalog with Google Sheets integration and cloud sync</p>
+            <p className="text-gray-600">Manage your product catalog with Google Sheets integration and local storage</p>
           </div>
         </div>
         <div className="text-right">
@@ -393,28 +370,28 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
         </div>
       </div>
 
-      {/* Cloud Status */}
+      {/* Local Storage Status */}
       <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Cloud className="w-5 h-5 text-purple-600 mr-2" />
+            <HardDrive className="w-5 h-5 text-purple-600 mr-2" />
             <div>
-              <h3 className="text-sm font-semibold text-purple-800">Cloud Storage Status</h3>
+              <h3 className="text-sm font-semibold text-purple-800">Local Storage Status</h3>
               <p className="text-xs text-purple-600">
-                {cloudInfo.count > 0 
-                  ? `${cloudInfo.count} products in cloud • Last updated: ${formatDate(cloudInfo.lastUpdated)}`
-                  : 'No cloud data found'
+                {products.length > 0 
+                  ? `${products.length} products stored locally in IndexedDB`
+                  : 'No local data found'
                 }
               </p>
             </div>
           </div>
           <button
-            onClick={handleSyncWithCloud}
+            onClick={handleSyncWithLocal}
             disabled={isLoading}
             className="flex items-center px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50 text-sm"
           >
             <Sync className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-            Sync
+            Refresh
           </button>
         </div>
       </div>
@@ -457,7 +434,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
               ) : (
                 <>
                   <Download className="w-4 h-4 mr-2" />
-                  Import & Save to Cloud
+                  Import & Save Locally
                 </>
               )}
             </button>
@@ -478,7 +455,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
             <li>Go to File → Share → Publish to web</li>
             <li>Choose "Entire Document" and "Comma-separated values (.csv)"</li>
             <li>Click "Publish" and copy the generated URL</li>
-            <li>Paste the URL above and click "Import & Save to Cloud"</li>
+            <li>Paste the URL above and click "Import & Save Locally"</li>
           </ol>
         </div>
       </div>
@@ -637,8 +614,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ onMessage, productData
           <div className="text-sm text-gray-600 mb-4 flex items-center justify-between">
             <span>Showing {filteredProducts.length} of {products.length} products</span>
             <div className="flex items-center text-purple-600">
-              <Cloud className="w-4 h-4 mr-1" />
-              <span>Synced to cloud</span>
+              <HardDrive className="w-4 h-4 mr-1" />
+              <span>Stored locally</span>
             </div>
           </div>
           

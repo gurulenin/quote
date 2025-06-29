@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { firebaseManager } from '../utils/firebaseManager';
-import { User } from 'firebase/auth';
+import { indexedDBManager } from '../utils/indexedDB';
 
 export interface ProductData {
   Description: string;
@@ -10,12 +9,12 @@ export interface ProductData {
   [key: string]: any;
 }
 
-export const useProductData = (firebaseUser: User | null) => {
+export const useProductData = (user: any) => {
   const [products, setProducts] = useState<ProductData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadProductData = async () => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       setProducts([]);
       setIsLoading(false);
       return;
@@ -23,16 +22,11 @@ export const useProductData = (firebaseUser: User | null) => {
 
     setIsLoading(true);
     try {
-      // Try to load from Firebase first
-      const firebaseProducts = await firebaseManager.getProductData();
-      if (firebaseProducts.length > 0) {
-        setProducts(firebaseProducts);
-      } else {
-        // Fallback to localStorage if no Firebase data
-        loadStoredProductData();
-      }
+      await indexedDBManager.init();
+      const productData = await indexedDBManager.getProductData();
+      setProducts(productData);
     } catch (error) {
-      console.error('Error loading product data from Firebase:', error);
+      console.error('Error loading product data:', error);
       // Fallback to localStorage
       loadStoredProductData();
     } finally {
@@ -53,7 +47,7 @@ export const useProductData = (firebaseUser: User | null) => {
   };
 
   const saveProductData = async (productData: ProductData[]) => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       // Fallback to localStorage only when not authenticated
       try {
         localStorage.setItem('imported_product_data', JSON.stringify(productData));
@@ -66,8 +60,8 @@ export const useProductData = (firebaseUser: User | null) => {
     }
 
     try {
-      // Save to Firebase
-      await firebaseManager.saveProductData(productData);
+      await indexedDBManager.init();
+      await indexedDBManager.saveProductData(productData);
       
       // Also save to localStorage as backup
       localStorage.setItem('imported_product_data', JSON.stringify(productData));
@@ -110,7 +104,7 @@ export const useProductData = (firebaseUser: User | null) => {
   };
 
   const syncWithCloud = async () => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       return false;
     }
 
@@ -153,14 +147,14 @@ export const useProductData = (firebaseUser: User | null) => {
   };
 
   useEffect(() => {
-    if (firebaseUser) {
+    if (user?.isAuthenticated) {
       loadProductData();
     } else {
       // Clear data when user logs out
       setProducts([]);
       setIsLoading(false);
     }
-  }, [firebaseUser]);
+  }, [user?.isAuthenticated]);
 
   return {
     products,

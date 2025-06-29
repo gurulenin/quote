@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { firebaseManager } from '../utils/firebaseManager';
-import { User } from 'firebase/auth';
+import { indexedDBManager } from '../utils/indexedDB';
 
 export interface ClientData {
   Name: string;
@@ -11,12 +10,12 @@ export interface ClientData {
   [key: string]: any;
 }
 
-export const useClientData = (firebaseUser: User | null) => {
+export const useClientData = (user: any) => {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadClientData = async () => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       setClients([]);
       setIsLoading(false);
       return;
@@ -24,16 +23,11 @@ export const useClientData = (firebaseUser: User | null) => {
 
     setIsLoading(true);
     try {
-      // Try to load from Firebase first
-      const firebaseClients = await firebaseManager.getClientData();
-      if (firebaseClients.length > 0) {
-        setClients(firebaseClients);
-      } else {
-        // Fallback to localStorage if no Firebase data
-        loadStoredClientData();
-      }
+      await indexedDBManager.init();
+      const clientData = await indexedDBManager.getClientData();
+      setClients(clientData);
     } catch (error) {
-      console.error('Error loading client data from Firebase:', error);
+      console.error('Error loading client data:', error);
       // Fallback to localStorage
       loadStoredClientData();
     } finally {
@@ -54,7 +48,7 @@ export const useClientData = (firebaseUser: User | null) => {
   };
 
   const saveClientData = async (clientData: ClientData[]) => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       // Fallback to localStorage only when not authenticated
       try {
         localStorage.setItem('imported_client_data', JSON.stringify(clientData));
@@ -67,8 +61,8 @@ export const useClientData = (firebaseUser: User | null) => {
     }
 
     try {
-      // Save to Firebase
-      await firebaseManager.saveClientData(clientData);
+      await indexedDBManager.init();
+      await indexedDBManager.saveClientData(clientData);
       
       // Also save to localStorage as backup
       localStorage.setItem('imported_client_data', JSON.stringify(clientData));
@@ -111,7 +105,7 @@ export const useClientData = (firebaseUser: User | null) => {
   };
 
   const syncWithCloud = async () => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       return false;
     }
 
@@ -155,14 +149,14 @@ export const useClientData = (firebaseUser: User | null) => {
   };
 
   useEffect(() => {
-    if (firebaseUser) {
+    if (user?.isAuthenticated) {
       loadClientData();
     } else {
       // Clear data when user logs out
       setClients([]);
       setIsLoading(false);
     }
-  }, [firebaseUser]);
+  }, [user?.isAuthenticated]);
 
   return {
     clients,

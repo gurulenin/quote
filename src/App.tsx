@@ -29,12 +29,10 @@ import { DocumentType, CompanyInfo, ClientInfo, DocumentInfo, BankInfo, LineItem
 function App() {
   const { 
     user, 
-    firebaseUser,
-    loginWithEmail,
-    registerWithEmail,
-    resetPassword,
+    loginWithSecretKey,
     logout, 
-    isLoading: authLoading 
+    isLoading: authLoading,
+    getSessionInfo
   } = useAuth();
   
   const { 
@@ -45,11 +43,11 @@ function App() {
     importDocuments,
     isLoading: documentsLoading,
     error: documentsError 
-  } = useDocuments(firebaseUser);
+  } = useDocuments(user);
 
-  // Initialize client and product data hooks with firebaseUser
-  const clientDataHook = useClientData(firebaseUser);
-  const productDataHook = useProductData(firebaseUser);
+  // Initialize client and product data hooks with user
+  const clientDataHook = useClientData(user);
+  const productDataHook = useProductData(user);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'documents' | 'clients' | 'products' | 'reports'>('documents');
@@ -183,7 +181,7 @@ function App() {
     console.log('Save document clicked');
     
     // Check authentication first
-    if (!firebaseUser) {
+    if (!user.isAuthenticated) {
       showUserMessage('Please log in to save documents');
       return;
     }
@@ -301,13 +299,13 @@ function App() {
     }
   };
 
-  const handleSyncWithCloud = async () => {
-    // Firebase automatically syncs, so just refresh the documents
+  const handleSyncWithLocal = async () => {
+    // IndexedDB automatically syncs, so just refresh the documents
     try {
-      showUserMessage('Data synced successfully!');
+      showUserMessage('Data refreshed successfully!');
     } catch (error) {
-      console.error('Error syncing data:', error);
-      showUserMessage('Failed to sync data');
+      console.error('Error refreshing data:', error);
+      showUserMessage('Failed to refresh data');
     }
   };
 
@@ -333,9 +331,7 @@ function App() {
   if (!user.isAuthenticated) {
     return (
       <LoginForm 
-        onEmailLogin={loginWithEmail}
-        onEmailRegister={registerWithEmail}
-        onPasswordReset={resetPassword}
+        onSecretKeyLogin={loginWithSecretKey}
       />
     );
   }
@@ -345,13 +341,13 @@ function App() {
       <Header 
         onLogout={logout} 
         user={user}
-        firebaseUser={firebaseUser}
+        sessionInfo={getSessionInfo()}
       />
       
       {userMessage && <UserMessage message={userMessage} />}
       
       <FirebaseStatus 
-        onSync={handleSyncWithCloud}
+        onSync={handleSyncWithLocal}
         isLoading={documentsLoading}
       />
       

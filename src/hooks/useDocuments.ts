@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
 import { SavedDocument, DocumentType } from '../types';
-import { firebaseManager } from '../utils/firebaseManager';
-import { User } from 'firebase/auth';
+import { indexedDBManager } from '../utils/indexedDB';
 
-export const useDocuments = (firebaseUser: User | null) => {
+export const useDocuments = (user: any) => {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadDocuments = async () => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       setDocuments([]);
       setIsLoading(false);
       return;
@@ -18,7 +17,8 @@ export const useDocuments = (firebaseUser: User | null) => {
     try {
       setIsLoading(true);
       setError(null);
-      const docs = await firebaseManager.getAllDocuments();
+      await indexedDBManager.init();
+      const docs = await indexedDBManager.getAllDocuments();
       setDocuments(docs);
     } catch (err) {
       console.error('Error loading documents:', err);
@@ -30,12 +30,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const saveDocument = async (documentData: Omit<SavedDocument, 'id'>): Promise<string> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
     try {
-      const docId = await firebaseManager.saveDocument(documentData);
+      await indexedDBManager.init();
+      const docId = await indexedDBManager.saveDocument(documentData);
       await loadDocuments(); // Refresh the list
       return docId;
     } catch (err) {
@@ -45,12 +46,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const deleteDocument = async (docId: string): Promise<void> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
     try {
-      await firebaseManager.deleteDocument(docId);
+      await indexedDBManager.init();
+      await indexedDBManager.deleteDocument(docId);
       await loadDocuments(); // Refresh the list
     } catch (err) {
       console.error('Error deleting document:', err);
@@ -59,12 +61,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const updateDocument = async (docId: string, documentData: Partial<SavedDocument>): Promise<void> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
     try {
-      await firebaseManager.updateDocument(docId, documentData);
+      await indexedDBManager.init();
+      await indexedDBManager.updateDocument(docId, documentData);
       await loadDocuments(); // Refresh the list
     } catch (err) {
       console.error('Error updating document:', err);
@@ -73,12 +76,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const getDocumentById = async (docId: string): Promise<SavedDocument | null> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
     try {
-      return await firebaseManager.getDocumentById(docId);
+      await indexedDBManager.init();
+      return await indexedDBManager.getDocumentById(docId);
     } catch (err) {
       console.error('Error getting document by ID:', err);
       throw err;
@@ -86,12 +90,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const clearAllDocuments = async (): Promise<void> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
     try {
-      await firebaseManager.clearAllDocuments();
+      await indexedDBManager.init();
+      await indexedDBManager.clearAllDocuments();
       await loadDocuments(); // Refresh the list
     } catch (err) {
       console.error('Error clearing documents:', err);
@@ -100,12 +105,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const importDocuments = async (docs: Omit<SavedDocument, 'id'>[]): Promise<void> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
     try {
-      await firebaseManager.importDocuments(docs);
+      await indexedDBManager.init();
+      await indexedDBManager.importDocuments(docs);
       await loadDocuments(); // Refresh the list
     } catch (err) {
       console.error('Error importing documents:', err);
@@ -114,12 +120,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const getDocumentsByType = async (docType: DocumentType): Promise<SavedDocument[]> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
     try {
-      return await firebaseManager.getDocumentsByType(docType);
+      await indexedDBManager.init();
+      return await indexedDBManager.getDocumentsByType(docType);
     } catch (err) {
       console.error('Error getting documents by type:', err);
       throw err;
@@ -127,12 +134,13 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   const checkDuplicateNumber = async (docNumber: string, docType: DocumentType, excludeDocId?: string): Promise<boolean> => {
-    if (!firebaseUser) {
+    if (!user?.isAuthenticated) {
       return false;
     }
 
     try {
-      return await firebaseManager.checkDuplicateNumber(docNumber, docType, excludeDocId);
+      await indexedDBManager.init();
+      return await indexedDBManager.checkDuplicateNumber(docNumber, docType, excludeDocId);
     } catch (err) {
       console.error('Error checking duplicate number:', err);
       return false;
@@ -140,7 +148,7 @@ export const useDocuments = (firebaseUser: User | null) => {
   };
 
   useEffect(() => {
-    if (firebaseUser) {
+    if (user?.isAuthenticated) {
       loadDocuments();
     } else {
       // Clear data when user logs out
@@ -148,7 +156,7 @@ export const useDocuments = (firebaseUser: User | null) => {
       setError(null);
       setIsLoading(false);
     }
-  }, [firebaseUser]);
+  }, [user?.isAuthenticated]);
 
   return {
     documents,

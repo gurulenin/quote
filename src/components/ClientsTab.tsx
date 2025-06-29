@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Download, Upload, Plus, Search, Edit3, Trash2, Globe, RefreshCw, CheckCircle, AlertCircle, FileSpreadsheet, Cloud, Tag, FolderSync as Sync, Info } from 'lucide-react';
+import { Users, Download, Upload, Plus, Search, Edit3, Trash2, Globe, RefreshCw, CheckCircle, AlertCircle, FileSpreadsheet, HardDrive, Tag, FolderSync as Sync, Info } from 'lucide-react';
 import { useClientData, ClientData } from '../hooks/useClientData';
 
 interface ClientsTabProps {
@@ -29,11 +29,6 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
   const [lastSync, setLastSync] = useState(
     localStorage.getItem('last_client_sync') || null
   );
-  const [cloudInfo, setCloudInfo] = useState<{
-    lastUpdated: string | null;
-    source: string;
-    count: number;
-  }>({ lastUpdated: null, source: 'none', count: 0 });
 
   const [newClient, setNewClient] = useState<ClientData>({
     Name: '',
@@ -42,21 +37,6 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
     GSTIN: '',
     Email: ''
   });
-
-  // Load cloud info on component mount
-  React.useEffect(() => {
-    loadCloudInfo();
-  }, []);
-
-  const loadCloudInfo = async () => {
-    try {
-      const { firebaseManager } = await import('../utils/firebaseManager');
-      const info = await firebaseManager.getClientDataInfo();
-      setCloudInfo(info);
-    } catch (error) {
-      console.error('Error loading cloud info:', error);
-    }
-  };
 
   // Filter clients based on search term
   const filteredClients = clients.filter(client =>
@@ -199,9 +179,11 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
         throw new Error('No valid data rows found in the sheet. Please ensure your sheet contains data rows with at least one non-empty cell per row.');
       }
       
-      // Save to Firebase with Google Sheets source
-      const { firebaseManager } = await import('../utils/firebaseManager');
-      await firebaseManager.saveClientData(clientData, 'google_sheets', googleSheetUrl);
+      // Save to IndexedDB
+      const success = await clientDataHook.saveClientData(clientData);
+      if (!success) {
+        throw new Error('Failed to save client data to local storage');
+      }
       
       // Also save to localStorage as backup
       localStorage.setItem('imported_client_data', JSON.stringify(clientData));
@@ -212,11 +194,10 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
       setLastSync(timestamp);
       
       setLoadStatus('success');
-      onMessage(`Successfully loaded ${clientData.length} client records from Google Sheets and saved to cloud`);
+      onMessage(`Successfully loaded ${clientData.length} client records from Google Sheets and saved locally`);
       
-      // Refresh the data and cloud info
+      // Refresh the data
       await refreshData();
-      await loadCloudInfo();
     } catch (error) {
       console.error('Error loading client data:', error);
       setLoadStatus('error');
@@ -282,8 +263,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
           Email: ''
         });
         setShowAddForm(false);
-        onMessage('New client added successfully and saved to cloud');
-        await loadCloudInfo();
+        onMessage('New client added successfully and saved locally');
       } else {
         onMessage('Failed to add new client');
       }
@@ -314,8 +294,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
       const success = await updateClient(clientIndex, editingClient);
       if (success) {
         setEditingClient(null);
-        onMessage('Client updated successfully and saved to cloud');
-        await loadCloudInfo();
+        onMessage('Client updated successfully and saved locally');
       } else {
         onMessage('Failed to update client');
       }
@@ -333,8 +312,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
     try {
       const success = await deleteClient(clientToDelete);
       if (success) {
-        onMessage('Client deleted successfully and updated in cloud');
-        await loadCloudInfo();
+        onMessage('Client deleted successfully and updated locally');
       } else {
         onMessage('Failed to delete client');
       }
@@ -344,19 +322,18 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
     }
   };
 
-  const handleSyncWithCloud = async () => {
+  const handleSyncWithLocal = async () => {
     try {
       setIsLoading(true);
       const success = await syncWithCloud();
       if (success) {
-        onMessage('Client data synced successfully with cloud');
-        await loadCloudInfo();
+        onMessage('Client data refreshed successfully');
       } else {
-        onMessage('Failed to sync client data');
+        onMessage('Failed to refresh client data');
       }
     } catch (error) {
-      console.error('Error syncing client data:', error);
-      onMessage('Failed to sync client data');
+      console.error('Error refreshing client data:', error);
+      onMessage('Failed to refresh client data');
     } finally {
       setIsLoading(false);
     }
@@ -374,7 +351,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
       case 'error':
         return <AlertCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <Cloud className="w-4 h-4 text-gray-400" />;
+        return <HardDrive className="w-4 h-4 text-gray-400" />;
     }
   };
 
@@ -385,7 +362,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
           <Users className="w-8 h-8 text-blue-600 mr-3" />
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Client Management</h1>
-            <p className="text-gray-600">Manage your client database with Google Sheets integration and cloud sync</p>
+            <p className="text-gray-600">Manage your client database with Google Sheets integration and local storage</p>
           </div>
         </div>
         <div className="text-right">
@@ -394,28 +371,28 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
         </div>
       </div>
 
-      {/* Cloud Status */}
-      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      {/* Local Storage Status */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Cloud className="w-5 h-5 text-blue-600 mr-2" />
+            <HardDrive className="w-5 h-5 text-green-600 mr-2" />
             <div>
-              <h3 className="text-sm font-semibold text-blue-800">Cloud Storage Status</h3>
-              <p className="text-xs text-blue-600">
-                {cloudInfo.count > 0 
-                  ? `${cloudInfo.count} clients in cloud • Last updated: ${formatDate(cloudInfo.lastUpdated)}`
-                  : 'No cloud data found'
+              <h3 className="text-sm font-semibold text-green-800">Local Storage Status</h3>
+              <p className="text-xs text-green-600">
+                {clients.length > 0 
+                  ? `${clients.length} clients stored locally in IndexedDB`
+                  : 'No local data found'
                 }
               </p>
             </div>
           </div>
           <button
-            onClick={handleSyncWithCloud}
+            onClick={handleSyncWithLocal}
             disabled={isLoading}
-            className="flex items-center px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
+            className="flex items-center px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 text-sm"
           >
             <Sync className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-            Sync
+            Refresh
           </button>
         </div>
       </div>
@@ -458,7 +435,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
               ) : (
                 <>
                   <Download className="w-4 h-4 mr-2" />
-                  Import & Save to Cloud
+                  Import & Save Locally
                 </>
               )}
             </button>
@@ -479,7 +456,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
             <li>Go to File → Share → Publish to web</li>
             <li>Choose "Entire Document" and "Comma-separated values (.csv)"</li>
             <li>Click "Publish" and copy the generated URL</li>
-            <li>Paste the URL above and click "Import & Save to Cloud"</li>
+            <li>Paste the URL above and click "Import & Save Locally"</li>
           </ol>
         </div>
       </div>
@@ -633,9 +610,9 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({ onMessage, clientDataHoo
         <div className="space-y-4">
           <div className="text-sm text-gray-600 mb-4 flex items-center justify-between">
             <span>Showing {filteredClients.length} of {clients.length} clients</span>
-            <div className="flex items-center text-blue-600">
-              <Cloud className="w-4 h-4 mr-1" />
-              <span>Synced to cloud</span>
+            <div className="flex items-center text-green-600">
+              <HardDrive className="w-4 h-4 mr-1" />
+              <span>Stored locally</span>
             </div>
           </div>
           

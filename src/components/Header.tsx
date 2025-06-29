@@ -1,20 +1,33 @@
 import React from 'react';
-import { LogOut, FileText, Mail } from 'lucide-react';
+import { LogOut, FileText, Key, Clock } from 'lucide-react';
 import { User as UserType } from '../types';
-import { User as FirebaseUser } from 'firebase/auth';
 
 interface HeaderProps {
   onLogout: () => void;
   user: UserType;
-  firebaseUser: FirebaseUser | null;
+  sessionInfo?: {
+    loginTime: string;
+    expiresAt: string;
+    timeRemaining: number;
+  } | null;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onLogout, user, firebaseUser }) => {
-  const getDisplayName = () => {
-    if (firebaseUser && firebaseUser.email) {
-      return firebaseUser.email;
+export const Header: React.FC<HeaderProps> = ({ onLogout, user, sessionInfo }) => {
+  const formatTimeRemaining = (milliseconds: number) => {
+    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m`;
+    } else {
+      return 'Expiring soon';
     }
-    return 'User';
+  };
+
+  const getDisplayName = () => {
+    return 'Authenticated User';
   };
 
   return (
@@ -38,10 +51,18 @@ export const Header: React.FC<HeaderProps> = ({ onLogout, user, firebaseUser }) 
               <div className="text-sm font-medium text-gray-800">{getDisplayName()}</div>
               <div className="flex items-center justify-end mt-1">
                 <div className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                  <Mail className="w-3 h-3 mr-1" />
-                  Email Auth
+                  <Key className="w-3 h-3 mr-1" />
+                  Secret Key Auth
                 </div>
               </div>
+              {sessionInfo && (
+                <div className="flex items-center justify-end mt-1">
+                  <div className="flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {formatTimeRemaining(sessionInfo.timeRemaining)} left
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
